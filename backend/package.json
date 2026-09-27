@@ -26,13 +26,13 @@
     "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
-    "@types/express-session": "^1.18.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
     "@types/node": "^22.10.2",
-    "@types/nodemailer": "^6.4.17",
+    "@types/nodemailer": "^6.4.24",
     "@types/passport": "^1.0.17",
-    "@types/passport-google-oauth20": "^2.0.16",
+    "@types/passport-google-oauth20": "^2.0.17",
     "prisma": "^6.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

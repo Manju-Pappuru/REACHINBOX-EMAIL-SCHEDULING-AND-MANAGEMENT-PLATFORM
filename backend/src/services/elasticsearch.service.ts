@@ -36,8 +36,12 @@ interface SearchEmailResult {
 
 const elasticsearchUrl = process.env.ELASTICSEARCH_URL ?? 'http://localhost:9200';
 const emailIndex = process.env.ELASTICSEARCH_INDEX ?? 'emails';
+const apiKey = process.env.ELASTICSEARCH_API_KEY;
 
-export const elasticsearch = new Client({ node: elasticsearchUrl });
+export const elasticsearch = new Client({
+  node: elasticsearchUrl,
+  ...(apiKey ? { auth: { apiKey } } : {}),
+});
 
 let ensureIndexPromise: Promise<void> | undefined;
 
