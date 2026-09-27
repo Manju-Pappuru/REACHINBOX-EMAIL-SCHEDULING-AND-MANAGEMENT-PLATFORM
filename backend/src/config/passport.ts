@@ -40,6 +40,7 @@ if (googleOAuthConfigured) {
       clientID: clientId!,
       clientSecret: clientSecret!,
       callbackURL: callbackUrl!,
+      scope: ['profile', 'email'],
     },
     async (_accessToken, _refreshToken, profile, done) => {
       try {
