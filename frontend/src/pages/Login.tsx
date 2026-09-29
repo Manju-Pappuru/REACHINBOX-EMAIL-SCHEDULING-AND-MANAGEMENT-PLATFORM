@@ -8,6 +8,7 @@ export const Login: React.FC = () => {
   const { user, loading, loginWithGoogle, devLogin } = useAuth();
   const navigate = useNavigate();
   const [devLoading, setDevLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (user && !loading) {
@@ -24,6 +25,18 @@ export const Login: React.FC = () => {
       console.error('Dev login failed:', err);
     } finally {
       setDevLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Google login failed:', err);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -60,8 +73,9 @@ export const Login: React.FC = () => {
             <div>
               <button
                 type="button"
-                onClick={loginWithGoogle}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl text-sm font-semibold text-slate-900 bg-white hover:bg-slate-100 active:bg-slate-200 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 group"
+                onClick={handleGoogleLogin}
+                disabled={googleLoading}
+                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl text-sm font-semibold text-slate-900 bg-white hover:bg-slate-100 active:bg-slate-200 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 group disabled:opacity-50"
               >
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path

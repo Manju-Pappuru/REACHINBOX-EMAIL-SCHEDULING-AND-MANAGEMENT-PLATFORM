@@ -5,7 +5,7 @@ import type { User } from '../types';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  loginWithGoogle: () => void;
+  loginWithGoogle: () => Promise<void>;
   devLogin: (email?: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -32,8 +32,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void refreshUser();
   }, [refreshUser]);
 
-  const loginWithGoogle = useCallback(() => {
-    window.location.href = authService.getGoogleAuthUrl();
+  const loginWithGoogle = useCallback(async () => {
+    setLoading(true);
+    try {
+      const loggedInUser = await authService.loginWithGoogle();
+      setUser(loggedInUser);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const devLogin = useCallback(async (email?: string, name?: string) => {
@@ -76,4 +82,4 @@ export function useAuth(): AuthContextValue {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};

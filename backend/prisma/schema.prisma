@@ -26,6 +26,7 @@ enum CampaignStatus {
 model User {
   id               String            @id @default(cuid())
   googleId         String            @unique
+  firebaseUid      String?           @unique
   name             String
   email            String            @unique
   avatar           String?
@@ -37,6 +38,7 @@ model User {
 
   @@index([email])
   @@index([googleId])
+  @@index([firebaseUid])
 }
 
 model Sender {

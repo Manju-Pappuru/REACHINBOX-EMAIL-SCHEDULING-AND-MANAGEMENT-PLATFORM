@@ -7,9 +7,9 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 
-import { googleOAuthConfigured, passport } from './config/passport.js';
+import { firebaseAdminAvailable, getAuth } from './config/firebase.js';
 import { prisma } from './lib/prisma.js';
-import { getAuthenticatedUserId, requireAuthenticatedUser } from './middleware/auth.js';
+import { getAuthenticatedUserId, requireAuthenticatedUser, restoreUser, setUpUser } from './middleware/auth.js';
 import { emailQueue } from './queues/email.queue.js';
 import { emailQueueEvents } from './queues/queueEvents.js';
 import { emailWorker } from './queues/email.worker.js';
@@ -45,8 +45,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' },
 }));
-app.use(passport.initialize());
-app.use(passport.session());
+app.use(restoreUser);
 
 const bullBoardAdapter = new ExpressAdapter();
 bullBoardAdapter.setBasePath('/admin/queues');
@@ -60,30 +59,70 @@ app.get('/health', (_request, response) => {
   response.json({ status: 'ok' });
 });
 
-app.get('/api/auth/google', (request, response, next) => {
-  if (!googleOAuthConfigured) {
-    response.status(503).json({ error: 'Google OAuth is not configured.' });
+app.post('/api/auth/firebase', async (request, response) => {
+  if (!firebaseAdminAvailable) {
+    response.status(503).json({ error: 'Firebase is not configured.' });
     return;
   }
-  passport.authenticate('google', { scope: ['profile', 'email'] })(request, response, next);
-});
 
-app.get('/api/auth/google/callback', (request, response, next) => {
-  if (!googleOAuthConfigured) {
-    response.status(503).json({ error: 'Google OAuth is not configured.' });
+  const idToken = typeof request.body?.idToken === 'string' ? request.body.idToken : null;
+  if (!idToken) {
+    response.status(400).json({ error: 'idToken is required.' });
     return;
   }
-  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/login` })(
-    request,
-    response,
-    (error: unknown) => {
-      if (error) {
-        next(error);
-        return;
-      }
-      response.redirect(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/dashboard`);
-    },
-  );
+
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const email = (decodedToken.email ?? '').toLowerCase();
+    if (!email || !decodedToken.email_verified) {
+      response.status(401).json({ error: 'Email not verified.' });
+      return;
+    }
+
+    let user = await prisma.user.findUnique({ where: { firebaseUid: decodedToken.uid } });
+    if (!user) {
+      user = await prisma.user.findUnique({ where: { email } });
+    }
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          firebaseUid: decodedToken.uid,
+          googleId: decodedToken.uid,
+          name: decodedToken.name || email,
+          email,
+          avatar: decodedToken.picture,
+        },
+      });
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          firebaseUid: decodedToken.uid,
+          googleId: decodedToken.uid,
+          name: decodedToken.name || email,
+          email,
+          avatar: decodedToken.picture,
+        },
+      });
+    }
+
+    setUpUser(request, user);
+
+    let sender = await prisma.sender.findFirst({ where: { userId: user.id } });
+    if (!sender) {
+      sender = await prisma.sender.create({
+        data: {
+          userId: user.id,
+          email,
+          displayName: user.name,
+        },
+      });
+    }
+    response.json({ id: user.id, googleId: user.firebaseUid, name: user.name, email: user.email, avatar: user.avatar, senderId: sender.id });
+  } catch (error) {
+    console.error('Firebase auth error:', error);
+    response.status(401).json({ error: 'Invalid or expired token.' });
+  }
 });
 
 app.get('/api/auth/me', requireAuthenticatedUser, async (request, response) => {
@@ -125,13 +164,9 @@ app.post('/api/auth/dev-login', async (request, response) => {
     update: { displayName: user.name },
   });
 
-  request.login(user, (err) => {
-    if (err) {
-      response.status(500).json({ error: 'Failed to login' });
-      return;
-    }
-    response.json({ id: user.id, googleId: user.googleId, name: user.name, email: user.email, avatar: user.avatar, senderId: sender.id });
-  });
+  setUpUser(request, user);
+
+  response.json({ id: user.id, googleId: user.googleId, name: user.name, email: user.email, avatar: user.avatar, senderId: sender.id });
 });
 
 app.get('/api/slack/connect', requireAuthenticatedUser, (request, response) => {
@@ -204,19 +239,14 @@ app.delete('/api/slack/disconnect', requireAuthenticatedUser, async (request, re
 });
 
 app.post('/api/auth/logout', requireAuthenticatedUser, (request, response, next) => {
-  request.logout((error) => {
-    if (error) {
-      next(error);
+  request.user = undefined;
+  request.session.destroy((destroyError) => {
+    if (destroyError) {
+      next(destroyError);
       return;
     }
-    request.session.destroy((destroyError) => {
-      if (destroyError) {
-        next(destroyError);
-        return;
-      }
-      response.clearCookie('reachinbox.sid');
-      response.status(204).send();
-    });
+    response.clearCookie('reachinbox.sid');
+    response.status(204).send();
   });
 });
 

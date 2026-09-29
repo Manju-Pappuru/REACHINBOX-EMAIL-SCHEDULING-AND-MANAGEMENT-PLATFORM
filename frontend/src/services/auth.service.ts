@@ -1,9 +1,13 @@
 import api, { API_BASE_URL } from './api';
+import { signInWithGoogle, firebaseSignOut } from '../config/firebase';
 import type { User } from '../types';
 
 export const authService = {
-  getGoogleAuthUrl(): string {
-    return `${API_BASE_URL}/api/auth/google`;
+  async loginWithGoogle(): Promise<User> {
+    const firebaseUser = await signInWithGoogle();
+    const idToken = await firebaseUser.getIdToken();
+    const response = await api.post<User>('/api/auth/firebase', { idToken });
+    return response.data;
   },
 
   async getCurrentUser(): Promise<User | null> {
@@ -22,6 +26,7 @@ export const authService = {
 
   async logout(): Promise<void> {
     await api.post('/api/auth/logout');
+    await firebaseSignOut();
   },
 };
 
