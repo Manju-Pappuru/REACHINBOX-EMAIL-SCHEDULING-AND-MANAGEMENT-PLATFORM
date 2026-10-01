@@ -141,3 +141,8 @@ curl http://localhost:5000/api/emails/scheduled
 ```
 
 Only two recipients may be sent in the current UTC hour. The remaining rows remain present with delayed jobs, and their recipient IDs/job IDs are unchanged.
+
+## Demo Video
+
+Watch the project demonstration: [REACHINBOX – EMAIL SCHEDULING AND MANAGEMENT PLATFORM](https://youtu.be/p25XCSPVufQ?si=VkIVGH46dvvZshTV)
+
